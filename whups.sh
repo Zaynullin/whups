@@ -144,7 +144,7 @@ combine_iplist () {
     for DOMAIN in $DOMAINLIST; do
         PRE_IPLIST+=" $(cat $(/bin/ls ${WORKDIR}/${DOMAIN}.[Aa].*.rec| head -n1) | sort -n |uniq)"
     done
-    IPLIST=$(echo "${PRE_IPLIST}" | sort | uniq)
+    IPLIST=$(echo "${PRE_IPLIST}" | tr ' ' '\n' | sort | uniq | grep -v '^$')
 }
 
 validate_ip () {
