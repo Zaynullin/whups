@@ -2,10 +2,9 @@
 # script updates /etc/whitelist.iptables.cfg file with ip-addresses from  
 # whitelist.yclients.cloud DNS-record and reload iptables.whitelist service
 
-[ -z "$(which dig 2>/dev/null)" ] && echo "ERROR: no dig executable" 1>&2  && exit 1
-[ ! -f "/etc/init.d/iptables.whitelist" ] && echo "ERROR: no iptables.whitelist init-script" 1>&2 && exit 1
+[ -z "$(which dig 2>/dev/null)" ] && echo "[ERROR]: no dig executable" 1>&2  && exit 1
+[ ! -f "/etc/init.d/iptables.whitelist" ] && echo "[ERROR]: no iptables.whitelist init-script" 1>&2 && exit 1
 
-#DOMAINLIST="whitelist.yclients.cloud"
 # DOMAINLIST variable with DNS-records contains needed ip-addresses
 DOMAINLIST="office.yclients.tech vpn.yclients.cloud whitelist.yclients.cloud"
 # DOMAIN_AUTHORITY_NS  variable for authority DNS-servers, which will be used to get IP lists
@@ -155,20 +154,20 @@ validate_ip () {
 
 validate () {
     LINE_NO=`echo -n "$IPLIST" | wc -l`
+    if [ $LINE_NO -eq 0 ]; then
+            mlog "[ERROR]: Got empty IP list"
+            exit_script
+    fi
     COUNT=0
     for i in $IPLIST; do
-            if ! validate_ip $i; then
+        if ! validate_ip $i; then
             ((COUNT++))
-    mlog "[ERROR]: $i fail IP-check"
-    fi
+            mlog "[ERROR]: $i fail IP-check"
+        fi
     done
     if [ $COUNT -gt 0 ]; then
+            mlog "[ERROR]: some IPs fails the IP-check. See logs for details"
             exit_script
-    else
-            if [ $LINE_NO -eq 0 ]; then
-                    mlog "[ERROR]: Got empty IP list"
-                    exit_script
-            fi
     fi
 }
 
