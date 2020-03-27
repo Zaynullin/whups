@@ -79,26 +79,24 @@ dig_wrapper () {
 
     #in case not specified DNS-server - use default system settings
     if [ ! -z ${DNS} ]; then
-        dig $RECORD -t $TYPE @$DNS $DIG_ADVANCED_PARAMS > "${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out" 2> "${WORKDIR}/${RECORD}.${TYPE}.${DNS}.err"
+        dig $RECORD -t $TYPE @$DNS $DIG_ADVANCED_PARAMS > "${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out" 2>&1
     else
         DNS="system_default"
-        dig $RECORD -t $TYPE $DIG_ADVANCED_PARAMS > "${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out" 2> "${WORKDIR}/${RECORD}.${TYPE}.${DNS}.err"
+        dig $RECORD -t $TYPE $DIG_ADVANCED_PARAMS > "${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out" 2>&1
     fi
 
     #check dig exit code
     REZ=$?
     if [ $REZ -ne 0 ]; then
-        mlog "[ERROR]: Dig finished with code ${REZ} while resolving $DOMAIN"
-        e "Dig stdout:\n$(cat ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out)"
-        e "Dig stderr:\n$(cat ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.err)"
+        mlog "[ERROR]: Resolving $DOMAIN got error response from DNS server ${DNS}. Dig exit code ${REZ}. Dig output:"
+        e "$(cat ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out)"
         exit_script
     fi
     #check response status
     STATUS=$(grep -oP '(?<=status:\s)\w*' ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out)
     if [ "$STATUS" != "NOERROR" ]; then
-        mlog "[ERROR]: Dig status ${STATUS} while resolving $RECORD from ${DNS}"
-        e "Dig stdout:\n$(cat ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out)"
-        e "Dig stderr:\n$(cat ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.err)"
+        mlog "[ERROR]: Resolving $DOMAIN from DNS server ${DNS} got invalid status. Answer status: ${STATUS}. Dig output:"
+        e "$(cat ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out)"
         exit_script
     fi
 
@@ -117,7 +115,7 @@ get_ip_list () {
         # get records from every authority DNS-server
         unset DOMAIN_AUTHORITY_NS
         get_domain_ns $DOMAIN
-        [ -z "$DOMAIN_AUTHORITY_NS" ] && mlog "[ERROR]: empty  domain authority ns list for domain $DOMAIN" && exit_script
+        [ -z "$DOMAIN_AUTHORITY_NS" ] && mlog "[ERROR]: Empty  domain authority NS list for domain $DOMAIN" && exit_script
         for IT_NS in $DOMAIN_AUTHORITY_NS; do
             dig_wrapper $DOMAIN a $IT_NS
         done
@@ -131,22 +129,21 @@ get_ip_list () {
         md5sum ${WORKDIR}/${DOMAIN}.[Aa].*.rec > ${WORKDIR}/${DOMAIN}.md5check
         CHECK=$(awk '{print $1}' < ${WORKDIR}/${DOMAIN}.md5check | sort -u | wc -l)
         if [ $CHECK -ne 1 ]; then
-                mlog "[ERROR]: $DOMAIN did not pass consistency check. MD5Hash check\n$(cat ${WORKDIR}/${DOMAIN}.md5check | sed 's,'${WORKDIR}'/'${DOMAIN}'\.[Aa]\.\(.*\)\.rec$,\1,g')\n"
+                mlog "[ERROR]: $DOMAIN did not pass consistency check"
                 # SUM1 contains md5hash of most frequent ips lists - consider it as correct answer
                 SUM1=$(awk '{print $1}' < ${WORKDIR}/${DOMAIN}.md5check | sort | uniq -c | sort -rn | head -n 1 | awk '{print $2}')
                 SUM2=$(awk '{print $1}' < ${WORKDIR}/${DOMAIN}.md5check | sort | uniq -c | sort -n | head -n 1 | awk '{print $2}')
 
-                MOST_FREQ_REQ_OUTPUT=$(grep $SUM1 ${WORKDIR}/${DOMAIN}.md5check  | head -n 1 | awk '{print $2}' | sed 's,rec$,out,g')
-                e "MOST FREQUENT ANSWER IS FROM: $(echo $MOST_FREQ_REQ_OUTPUT | sed 's,'${WORKDIR}'/'${DOMAIN}'\.[Aa]\.\(.*\)\.out$,\1,g')"
-                e "$(cat $MOST_FREQ_REQ_OUTPUT)\n"
-
                 SUMS2=$(grep -v $SUM1 ${WORKDIR}/${DOMAIN}.md5check | awk '{print $1}' | sort -u)
 
                 for SUM2 in $SUMS2; do
-                    LESS_FREQ_REQ_OUTPUT=$(grep $SUM2 ${WORKDIR}/${DOMAIN}.md5check  | head -n 1 | awk '{print $2}' | sed 's,rec$,out,g')
-                    e "LESS FREQUENT ANSWER ($SUM2) FROM: $(echo $LESS_FREQ_REQ_OUTPUT | sed 's,'${WORKDIR}'/'${DOMAIN}'\.[Aa]\.\(.*\)\.out$,\1,g')"
-                    e "$(cat $LESS_FREQ_REQ_OUTPUT)\n"
+                    FAILED_REQ_OUTPUT=$(grep $SUM2 ${WORKDIR}/${DOMAIN}.md5check  | head -n 1 | awk '{print $2}' | sed 's,rec$,out,g')
+                    e "Got mismatched answer from DNS server $(echo $FAILED_REQ_OUTPUT | sed 's,'${WORKDIR}'/'${DOMAIN}'\.[Aa]\.\(.*\)\.out$,\1,g'):"
+                    e "$(cat $FAILED_REQ_OUTPUT)\n"
                 done
+                REFERENCE_OUTPUT=$(grep $SUM1 ${WORKDIR}/${DOMAIN}.md5check  | head -n 1 | awk '{print $2}')
+                e "The reference is:"
+                e "$(cat $REFERENCE_OUTPUT)"
                 exit_script
         else
             mlog "[OK]: Domain '$DOMAIN' passed consistency check"
