@@ -88,14 +88,14 @@ dig_wrapper () {
     #check dig exit code
     REZ=$?
     if [ $REZ -ne 0 ]; then
-        mlog "[ERROR]: Resolving $DOMAIN got error response from DNS server ${DNS}. Dig exit code ${REZ}. Dig output:"
+        mlog "[ERROR]: Getting $TYPE record for $DOMAIN recieved error response from DNS server ${DNS}. Dig exit code ${REZ}. Dig output:"
         e "$(cat ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out)"
         exit_script
     fi
     #check response status
     STATUS=$(grep -oP '(?<=status:\s)\w*' ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out)
     if [ "$STATUS" != "NOERROR" ]; then
-        mlog "[ERROR]: Resolving $DOMAIN from DNS server ${DNS} got invalid status. Answer status: ${STATUS}. Dig output:"
+        mlog "[ERROR]: Getting $TYPE record for $DOMAIN recieved error status from DNS server ${DNS}. Answer status: ${STATUS}. Dig output:"
         e "$(cat ${WORKDIR}/${RECORD}.${TYPE}.${DNS}.out)"
         exit_script
     fi
